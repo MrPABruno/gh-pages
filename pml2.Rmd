@@ -1,0 +1,61 @@
+---
+title: "PML Project"
+author: "Paul Bruno"
+date: "Thursday, June 18, 2015"
+output: html_document
+---
+
+To begin building the model, we load necessary data and packages:
+
+```{r}
+library(caret)
+library(ggplot2)
+training <- read.csv("./data/pml-training.csv", header = TRUE)
+testing <- read.csv("./data/pml-testing.csv", header = TRUE)
+set.seed(456)
+```
+
+I want to reserve a portion of my training data as a preliminary test set so that I can evaluate the accuracy of my model and estimate my out-of-sample error rate. To do this I partition 30% of the training data into a preliminary test set.
+
+```{r}
+inTrain <- createDataPartition(training$classe, p = 0.7, list = FALSE)
+train <- training[inTrain,]
+test1 <- training[-inTrain,]
+```
+
+A substantial fraction of the covariates have near-zero variance, and should be removed for efficiency purposes, as they will not lend significant predictive power to my model:
+
+```{r}
+nsv <- nearZeroVar(train)
+train <- train[,-nsv]
+```
+
+Additionally, several columns are devoted to user-specific data - such as identifiers or timestamps. Since the purpose of my model is to predict results for new data, these columns can be removed.
+
+```{r}
+train <- train[,-c(1, 2, 3, 4, 5, 6)]
+```
+
+Finally, for some variables a substantial fraction of the data is missing altogether, and these columns can be removed for analysis purposes. I discard variables consisting of more than 95% "NA"s.
+
+```{r}
+missingData <- 0
+for(i in 1:dim(train)[2]) {
+        missingData[i] <- mean(is.na(train[,i]))
+        
+}
+train <- train[,-which(missingData > 0.95)]
+```
+
+Now I can train a random forest model on the training subset of the training dataset. 
+
+modFitrf <- train(classe~., data = train, method = "rf", prox = TRUE)
+
+As a test of my model, I cross-validate it with the testing subset of data created earlier:
+
+
+pred <- predict(modFitrf, newdata = "test1")
+confusionMatrix(pred, test1$classe)
+
+
+This suggests that my model's out-of-sample accuracy is approximately 99.5%, or that my out-of-sample error rate will be roughly 0.5%.
